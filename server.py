@@ -31,7 +31,7 @@ def render_grid():
                         frame = buffer.popleft()
                         frame = cv2.resize(frame, (TILE_WIDTH, TILE_HEIGHT))
                         addr_str = client['addr'][0]
-                        cv2.putText(frame, addr_str, (TILE_WIDTH - 100, TILE_HEIGHT - 10),
+                        cv2.putText(frame, addr_str, ((TILE_WIDTH - 100) // 2, TILE_HEIGHT - 10),
                                     cv2.FONT_HERSHEY_SIMPLEX, 0.5, (0, 255, 0), 1)
                     else:
                         frame = np.zeros((TILE_HEIGHT, TILE_WIDTH, 3), dtype=np.uint8)
