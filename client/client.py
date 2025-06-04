@@ -2,9 +2,25 @@ import cv2
 import socket
 import dns.resolver
 import client_config as cc
+from cryptography.fernet import Fernet
+from cryptography.hazmat.primitives import hashes
+from cryptography.hazmat.primitives.kdf.pbkdf2 import PBKDF2HMAC
+import base64
 
 HOSTNAME = cc.CAMERA_DOMAIN_NAME
 SERVER_PORT = cc.CAMERA_SERVER_PORT
+ENCRYPTION_PASSWORD = "your_secure_password_here"  # Must match server password
+
+def setup_encryption():
+    salt = b'fixed_salt'  # Must match server salt
+    kdf = PBKDF2HMAC(
+        algorithm=hashes.SHA256(),
+        length=32,
+        salt=salt,
+        iterations=100000,
+    )
+    key = base64.urlsafe_b64encode(kdf.derive(ENCRYPTION_PASSWORD.encode()))
+    return Fernet(key)
 
 def resolve_hostname():
     try:
@@ -26,6 +42,9 @@ def resolve_hostname():
             return None
 
 def main():
+    # Setup encryption
+    cipher_suite = setup_encryption()
+    
     # Resolve server IP with fallback
     SERVER_IP = resolve_hostname()
     if not SERVER_IP:
@@ -54,9 +73,12 @@ def main():
             frame = cv2.resize(frame, (640, 480))
             _, jpeg = cv2.imencode('.jpg', frame, [int(cv2.IMWRITE_JPEG_QUALITY), 60])
             
-            # Send frame size then frame
-            sock.sendall(len(jpeg).to_bytes(2, 'big'))
-            sock.sendall(jpeg)
+            # Encrypt the frame data
+            encrypted_data = cipher_suite.encrypt(jpeg.tobytes())
+            
+            # Send encrypted frame size then encrypted frame
+            sock.sendall(len(encrypted_data).to_bytes(2, 'big'))
+            sock.sendall(encrypted_data)
 
             cv2.imshow('Client Webcam', frame)
             if cv2.waitKey(1) & 0xFF == ord('q'):

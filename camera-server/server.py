@@ -4,9 +4,11 @@ import cv2
 import numpy as np
 from collections import deque
 import time
+from crypto import VideoEncryption
 
 HOST = '0.0.0.0'
 PORT = 12345
+ENCRYPTION_PASSWORD = "your_secure_password_here"  # Change this to a secure password
 
 NUM_ROWS, NUM_COLS = 2, 3
 TILE_WIDTH, TILE_HEIGHT = 320, 240
@@ -14,6 +16,7 @@ NUM_SLOTS = NUM_ROWS * NUM_COLS
 
 clients = [None] * NUM_SLOTS  # Each slot holds {'buffer': deque, 'addr': addr, 'last_time': time}
 lock = threading.Lock()
+encryption = VideoEncryption(ENCRYPTION_PASSWORD)
 
 BASE_DELAY_SEC = 3
 TARGET_FPS = 24
@@ -68,7 +71,14 @@ def handle_client(conn, addr, slot_index):
                     break
                 frame_data += packet
 
-            frame = cv2.imdecode(np.frombuffer(frame_data, np.uint8), cv2.IMREAD_COLOR)
+            # Decrypt the frame data
+            try:
+                decrypted_data = encryption.decrypt_frame(frame_data)
+                frame = cv2.imdecode(np.frombuffer(decrypted_data, np.uint8), cv2.IMREAD_COLOR)
+            except Exception as e:
+                print(f"[SERVER] Decryption error: {e}")
+                continue
+
             if frame is not None:
                 with lock:
                     client = clients[slot_index]

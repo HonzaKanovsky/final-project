@@ -1,0 +1,68 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <title>Camera Stream Client</title>
+    <style>
+        body {
+            margin: 0;
+            padding: 20px;
+            background-color: #1a1a1a;
+            color: white;
+            font-family: Arial, sans-serif;
+        }
+        .container {
+            max-width: 800px;
+            margin: 0 auto;
+            text-align: center;
+        }
+        h1 {
+            margin-bottom: 20px;
+        }
+        .status {
+            margin: 20px 0;
+            padding: 10px;
+            border-radius: 5px;
+            background-color: #333;
+        }
+        .preview-container {
+            margin: 20px 0;
+        }
+        img {
+            max-width: 320px;
+            border: 2px solid #333;
+            border-radius: 8px;
+        }
+        .instructions {
+            margin: 20px 0;
+            padding: 15px;
+            background-color: #333;
+            border-radius: 5px;
+            text-align: left;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h1>Camera Stream Client</h1>
+        
+        <div class="status">
+            <p>Status: <span id="status">Connected</span></p>
+        </div>
+
+        <div class="preview-container">
+            <h2>Your Camera Preview</h2>
+            <img src="{{ url_for('preview') }}" alt="Camera Preview">
+        </div>
+
+        <div class="instructions">
+            <h3>Instructions:</h3>
+            <ul>
+                <li>Your camera is being streamed to the server</li>
+                <li>Only the server can see the combined view of all cameras</li>
+                <li>This preview shows what your camera is capturing</li>
+                <li>To stop streaming, close this window</li>
+            </ul>
+        </div>
+    </div>
+</body>
+</html> 

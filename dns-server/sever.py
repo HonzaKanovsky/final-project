@@ -2,11 +2,35 @@
 import socket
 import threading
 import domains as d
+from flask import Flask, jsonify
+import logging
 
-#dns config
+# Configure logging
+logging.basicConfig(
+    level=logging.INFO,
+    format='[%(asctime)s] %(levelname)s: %(message)s',
+    datefmt='%Y-%m-%d %H:%M:%S'
+)
+
+# DNS config
 DNS_HOST = '0.0.0.0'
 DNS_PORT = 5300
 DNS_TTL = 300
+
+# Web server config
+WEB_HOST = '0.0.0.0'
+WEB_PORT = 5301  # Different port for web service
+
+app = Flask(__name__)
+
+@app.route('/discover')
+def discover():
+    """Return available domains and their IPs"""
+    logging.info("Discovery request received")
+    return jsonify({
+        'domains': d.DOMAINS,
+        'default_domain': 'camera.local'  # Default domain to use
+    })
 
 def handle_dns_query(data, addr, sock):
     try:
@@ -30,10 +54,10 @@ def handle_dns_query(data, addr, sock):
                 break
 
         if not resolved_ip:
-            print(f"[DNS] No record found for: {queried_domain}")
+            logging.warning(f"No record found for: {queried_domain}")
             return
 
-        print(f"[DNS] Resolving {queried_domain} -> {resolved_ip}")
+        logging.info(f"Resolving {queried_domain} -> {resolved_ip}")
 
         # Build response
         transaction_id = data[:2]
@@ -59,19 +83,42 @@ def handle_dns_query(data, addr, sock):
         
         sock.sendto(response, addr)
     except Exception as e:
-        print(f"[DNS] Error handling query: {e}")
+        logging.error(f"Error handling query: {e}")
 
 def dns_server():
-    sock = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
-    sock.bind((DNS_HOST, DNS_PORT))
-    print(f"[DNS] Server running on {DNS_HOST}:{DNS_PORT}")
-    print("Configured domains:")
-    for domain, ip in d.DOMAINS.items():
-        print(f"  {domain} -> {ip}")
-    
-    while True:
-        data, addr = sock.recvfrom(512)
-        threading.Thread(target=handle_dns_query, args=(data, addr, sock)).start()
+    try:
+        sock = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
+        sock.bind((DNS_HOST, DNS_PORT))
+        logging.info(f"DNS Server running on {DNS_HOST}:{DNS_PORT}")
+        logging.info("Configured domains:")
+        for domain, ip in d.DOMAINS.items():
+            logging.info(f"  {domain} -> {ip}")
+        
+        while True:
+            data, addr = sock.recvfrom(512)
+            threading.Thread(target=handle_dns_query, args=(data, addr, sock)).start()
+    except Exception as e:
+        logging.error(f"DNS Server error: {e}")
+        raise
+
+def run_web_server():
+    try:
+        logging.info(f"Discovery service running on {WEB_HOST}:{WEB_PORT}")
+        app.run(host=WEB_HOST, port=WEB_PORT, debug=False, threaded=True)
+    except Exception as e:
+        logging.error(f"Web Server error: {e}")
+        raise
 
 if __name__ == "__main__":
-    dns_server()
+    try:
+        # Start DNS server in a separate thread
+        dns_thread = threading.Thread(target=dns_server, daemon=True)
+        dns_thread.start()
+        
+        # Start web server in main thread
+        run_web_server()
+    except KeyboardInterrupt:
+        logging.info("Server shutting down...")
+    except Exception as e:
+        logging.error(f"Fatal error: {e}")
+        raise

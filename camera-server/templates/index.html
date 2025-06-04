@@ -1,0 +1,87 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <title>Camera Stream Server - Admin View</title>
+    <style>
+        body {
+            margin: 0;
+            padding: 20px;
+            background-color: #1a1a1a;
+            color: white;
+            font-family: Arial, sans-serif;
+        }
+        .container {
+            max-width: 1200px;
+            margin: 0 auto;
+        }
+        h1 {
+            text-align: center;
+            margin-bottom: 20px;
+            color: #4CAF50;
+        }
+        .video-container {
+            width: 100%;
+            text-align: center;
+            margin-bottom: 20px;
+        }
+        img {
+            max-width: 100%;
+            height: auto;
+            border: 2px solid #333;
+            border-radius: 8px;
+        }
+        .status-panel {
+            background-color: #333;
+            padding: 20px;
+            border-radius: 8px;
+            margin-top: 20px;
+        }
+        .status-panel h2 {
+            margin-top: 0;
+            color: #4CAF50;
+        }
+        .client-list {
+            list-style: none;
+            padding: 0;
+        }
+        .client-list li {
+            padding: 10px;
+            margin: 5px 0;
+            background-color: #444;
+            border-radius: 4px;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h1>Camera Stream Server - Admin View</h1>
+        <div class="video-container">
+            <img src="{{ url_for('video_feed') }}" alt="Camera Stream">
+        </div>
+        <div class="status-panel">
+            <h2>Connected Clients</h2>
+            <ul class="client-list" id="clientList">
+                <!-- Client list will be populated by JavaScript -->
+            </ul>
+        </div>
+    </div>
+    <script>
+        // Update client list every 5 seconds
+        function updateClientList() {
+            fetch('/client_list')
+                .then(response => response.json())
+                .then(data => {
+                    const clientList = document.getElementById('clientList');
+                    clientList.innerHTML = '';
+                    data.forEach(client => {
+                        const li = document.createElement('li');
+                        li.textContent = `Client: ${client.address} (Slot ${client.slot})`;
+                        clientList.appendChild(li);
+                    });
+                });
+        }
+        setInterval(updateClientList, 5000);
+        updateClientList();
+    </script>
+</body>
+</html> 
