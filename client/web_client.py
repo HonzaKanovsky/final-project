@@ -13,6 +13,17 @@ import os
 import requests
 import json
 import numpy as np
+import logging
+import sys
+
+logging.basicConfig(
+    level=logging.DEBUG,
+    format='[%(asctime)s] %(levelname)s [Web Client] %(message)s',
+    datefmt='%Y-%m-%d %H:%M:%S',
+    handlers=[
+        logging.StreamHandler(sys.stdout)
+    ]
+)
 
 app = Flask(__name__)
 
@@ -204,7 +215,8 @@ def run_web_client():
     stream_thread.start()
     
     # Start the web server
-    app.run(host='0.0.0.0', port=5001, debug=False, threaded=True)
+    print(f"[WEB] Starting web client on http://127.0.0.1:5001")
+    app.run(host='127.0.0.1', port=5001, debug=True, threaded=True)
 
 if __name__ == '__main__':
     run_web_client() 

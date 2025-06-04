@@ -151,9 +151,6 @@ A secure, web-based multi-camera streaming system that allows multiple clients t
 4. Push to the branch
 5. Create a Pull Request
 
-## License
-
-This project is licensed under the MIT License - see the LICENSE file for details.
 
 ## Acknowledgments
 

@@ -1,22 +1,24 @@
+from shared_config import *
+
 # DNS Configuration
-DNS_RESOLVER_IP = '127.0.0.1'  # Local DNS server IP
-DNS_RESOLVER_PORT = 5300       # Custom DNS server port
-CAMERA_DOMAIN_NAME = 'camera.local'  # Default domain name for camera server
-CAMERA_SERVER_PORT = 12345
+DNS_RESOLVER_IP = LOCAL_IP
+DNS_RESOLVER_PORT = DNS_PORT
+CAMERA_DOMAIN_NAME = CAMERA_DOMAIN_NAME
+CAMERA_SERVER_PORT = CAMERA_SERVER_PORT
 
 # Discovery Configuration
-DISCOVERY_SERVER_IP = '127.0.0.1'  # DNS server's IP (same as DNS_RESOLVER_IP)
-DISCOVERY_SERVER_PORT = 5301      # Discovery service port
-DISCOVERY_ENABLED = True          # Enable/disable discovery
+DISCOVERY_SERVER_IP = LOCAL_IP
+DISCOVERY_SERVER_PORT = DISCOVERY_PORT
+DISCOVERY_ENABLED = True
 
 # Fallback server IP (in case DNS fails)
-FALLBACK_SERVER_IP = '127.0.0.1'  # Change this to your server's IP
+FALLBACK_SERVER_IP = LOCAL_IP
 
 # Camera Configuration
-CAMERA_INDEX = 0  # Try different indices (0, 1, 2) if camera not found
-CAMERA_WIDTH = 640
-CAMERA_HEIGHT = 480
+CAMERA_INDEX = CAMERA_INDEX
+CAMERA_WIDTH = CAMERA_WIDTH
+CAMERA_HEIGHT = CAMERA_HEIGHT
 
 # DNS Resolution Settings
-DNS_TIMEOUT = 5  # Timeout in seconds for DNS queries
-DNS_RETRIES = 3  # Number of retries for DNS queries
+DNS_TIMEOUT = DNS_TIMEOUT
+DNS_RETRIES = DNS_RETRIES

@@ -1,13 +1,9 @@
 # Domain to IP mappings
 DOMAINS = {
-    'camera.local': '127.0.0.1',  # Local camera server
-    'camera1.local': '127.0.0.1',  # Additional camera server
-    'camera2.local': '127.0.0.1',   # Additional camera server
-    'internex.first': '127.0.0.1',  # Keep this for backward compatibility
-    'internex.first': '192.168.35.67',
-    'internex.first': '192.168.35.121',
-    # Add more mappings as needed
+    'surveleince-1.lan.internex': '127.0.0.1',  # Local camera server
+    'surveleince-2.lan.internex': '127.0.0.1',  # Additional camera server
+    'surveleince-3.lan.internex': '127.0.0.1',   # Additional camera server
 }
 
 # Default domain to use
-DEFAULT_DOMAIN = 'camera.local'
+DEFAULT_DOMAIN = 'surveleince-1.lan.internex'

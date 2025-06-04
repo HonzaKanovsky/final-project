@@ -4,32 +4,30 @@ import threading
 import domains as d
 from flask import Flask, jsonify
 import logging
+from shared_config import *
+import sys
 
 # Configure logging
 logging.basicConfig(
-    level=logging.INFO,
-    format='[%(asctime)s] %(levelname)s: %(message)s',
-    datefmt='%Y-%m-%d %H:%M:%S'
+    level=logging.DEBUG,
+    format='[%(asctime)s] %(levelname)s [DNS Server] %(message)s',
+    datefmt='%Y-%m-%d %H:%M:%S',
+    handlers=[
+        logging.StreamHandler(sys.stdout)
+    ]
 )
 
-# DNS config
-DNS_HOST = '0.0.0.0'
-DNS_PORT = 5300
-DNS_TTL = 300
-
-# Web server config
-WEB_HOST = '0.0.0.0'
-WEB_PORT = 5301  # Different port for web service
+logger = logging.getLogger(__name__)
 
 app = Flask(__name__)
 
 @app.route('/discover')
 def discover():
     """Return available domains and their IPs"""
-    logging.info("Discovery request received")
+    logger.info("Discovery request received")
     return jsonify({
         'domains': d.DOMAINS,
-        'default_domain': 'camera.local'  # Default domain to use
+        'default_domain': CAMERA_DOMAIN_NAME
     })
 
 def handle_dns_query(data, addr, sock):
@@ -46,6 +44,8 @@ def handle_dns_query(data, addr, sock):
             pos += 1 + length
         queried_domain = b'.'.join(domain_parts).decode('ascii').lower()
 
+        logger.debug(f"Received DNS query for domain: {queried_domain} from {addr}")
+
         # Find matching domain (supports subdomains too)
         resolved_ip = None
         for domain, ip in d.DOMAINS.items():
@@ -54,10 +54,10 @@ def handle_dns_query(data, addr, sock):
                 break
 
         if not resolved_ip:
-            logging.warning(f"No record found for: {queried_domain}")
+            logger.warning(f"No record found for domain: {queried_domain}")
             return
 
-        logging.info(f"Resolving {queried_domain} -> {resolved_ip}")
+        logger.info(f"Resolving {queried_domain} -> {resolved_ip}")
 
         # Build response
         transaction_id = data[:2]
@@ -82,35 +82,38 @@ def handle_dns_query(data, addr, sock):
         )
         
         sock.sendto(response, addr)
+        logger.debug(f"Sent DNS response to {addr}")
     except Exception as e:
-        logging.error(f"Error handling query: {e}")
+        logger.error(f"Error handling DNS query: {e}", exc_info=True)
 
 def dns_server():
     try:
         sock = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
-        sock.bind((DNS_HOST, DNS_PORT))
-        logging.info(f"DNS Server running on {DNS_HOST}:{DNS_PORT}")
-        logging.info("Configured domains:")
+        sock.bind((BIND_IP, DNS_PORT))
+        logger.info(f"DNS Server running on {BIND_IP}:{DNS_PORT}")
+        logger.info("Configured domains:")
         for domain, ip in d.DOMAINS.items():
-            logging.info(f"  {domain} -> {ip}")
+            logger.info(f"  {domain} -> {ip}")
         
         while True:
             data, addr = sock.recvfrom(512)
+            logger.debug(f"Received DNS query from {addr}")
             threading.Thread(target=handle_dns_query, args=(data, addr, sock)).start()
     except Exception as e:
-        logging.error(f"DNS Server error: {e}")
+        logger.error(f"DNS Server error: {e}", exc_info=True)
         raise
 
 def run_web_server():
     try:
-        logging.info(f"Discovery service running on {WEB_HOST}:{WEB_PORT}")
-        app.run(host=WEB_HOST, port=WEB_PORT, debug=False, threaded=True)
+        logger.info(f"Discovery service running on {BIND_IP}:{DISCOVERY_PORT}")
+        app.run(host=BIND_IP, port=DISCOVERY_PORT, debug=False, threaded=True)
     except Exception as e:
-        logging.error(f"Web Server error: {e}")
+        logger.error(f"Web Server error: {e}", exc_info=True)
         raise
 
 if __name__ == "__main__":
     try:
+        logger.info("Starting DNS Server...")
         # Start DNS server in a separate thread
         dns_thread = threading.Thread(target=dns_server, daemon=True)
         dns_thread.start()
@@ -118,7 +121,7 @@ if __name__ == "__main__":
         # Start web server in main thread
         run_web_server()
     except KeyboardInterrupt:
-        logging.info("Server shutting down...")
+        logger.info("Server shutting down...")
     except Exception as e:
-        logging.error(f"Fatal error: {e}")
+        logger.error(f"Fatal error: {e}", exc_info=True)
         raise

@@ -5,23 +5,28 @@ import numpy as np
 from collections import deque
 import time
 from crypto import VideoEncryption
+from shared_config import *
+import logging
+import sys
 
-HOST = '0.0.0.0'
-PORT = 12345
-ENCRYPTION_PASSWORD = "your_secure_password_here"  # Change this to a secure password
+# Configure logging
+logging.basicConfig(
+    level=logging.DEBUG,
+    format='[%(asctime)s] %(levelname)s [Camera Server] %(message)s',
+    datefmt='%Y-%m-%d %H:%M:%S',
+    handlers=[
+        logging.StreamHandler(sys.stdout)
+    ]
+)
 
-NUM_ROWS, NUM_COLS = 2, 3
-TILE_WIDTH, TILE_HEIGHT = 320, 240
-NUM_SLOTS = NUM_ROWS * NUM_COLS
+logger = logging.getLogger(__name__)
 
 clients = [None] * NUM_SLOTS  # Each slot holds {'buffer': deque, 'addr': addr, 'last_time': time}
 lock = threading.Lock()
 encryption = VideoEncryption(ENCRYPTION_PASSWORD)
 
-BASE_DELAY_SEC = 3
-TARGET_FPS = 24
-
 def render_grid():
+    logger.info("Starting grid rendering thread")
     while True:
         grid = []
         with lock:
@@ -50,11 +55,12 @@ def render_grid():
         full_grid = np.vstack(rows)
         cv2.imshow("All Camera Feeds", full_grid)
         if cv2.waitKey(40) == ord('q'):
+            logger.info("Grid rendering stopped by user")
             break
     cv2.destroyAllWindows()
 
 def handle_client(conn, addr, slot_index):
-    print(f"[SERVER] Connected: {addr} -> slot {slot_index}")
+    logger.info(f"New client connected: {addr} -> slot {slot_index}")
     try:
         with lock:
             clients[slot_index] = {'buffer': deque(), 'addr': addr, 'last_time': time.time()}
@@ -62,6 +68,7 @@ def handle_client(conn, addr, slot_index):
         while True:
             size_data = conn.recv(2)
             if not size_data:
+                logger.debug(f"Client {addr} disconnected")
                 break
             frame_size = int.from_bytes(size_data, 'big')
             frame_data = b''
@@ -76,7 +83,7 @@ def handle_client(conn, addr, slot_index):
                 decrypted_data = encryption.decrypt_frame(frame_data)
                 frame = cv2.imdecode(np.frombuffer(decrypted_data, np.uint8), cv2.IMREAD_COLOR)
             except Exception as e:
-                print(f"[SERVER] Decryption error: {e}")
+                logger.error(f"Decryption error for client {addr}: {e}", exc_info=True)
                 continue
 
             if frame is not None:
@@ -88,36 +95,46 @@ def handle_client(conn, addr, slot_index):
 
                     fps = 1 / delta if delta > 0 else TARGET_FPS
                     dynamic_size = int(fps * BASE_DELAY_SEC)
-                    client['dynamic_buffer_size'] = min(dynamic_size, 100)
+                    client['dynamic_buffer_size'] = min(dynamic_size, MAX_BUFFER_SIZE)
 
                     buffer = client['buffer']
-                    if len(buffer) < 100:
+                    if len(buffer) < MAX_BUFFER_SIZE:
                         buffer.append(frame)
+                        logger.debug(f"Frame added to buffer for client {addr}, buffer size: {len(buffer)}")
 
     except Exception as e:
-        print(f"[SERVER] Error in slot {slot_index}: {e}")
+        logger.error(f"Error handling client {addr} in slot {slot_index}: {e}", exc_info=True)
     finally:
-        print(f"[SERVER] Disconnected: {addr}")
+        logger.info(f"Client disconnected: {addr}")
         with lock:
             clients[slot_index] = None
         conn.close()
 
 def server_main():
+    logger.info("Starting camera server...")
     s = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
-    s.bind((HOST, PORT))
+    s.bind((BIND_IP, CAMERA_SERVER_PORT))
     s.listen(NUM_SLOTS)
-    print(f"[SERVER] Listening on {HOST}:{PORT}")
+    logger.info(f"Camera server listening on {BIND_IP}:{CAMERA_SERVER_PORT}")
     threading.Thread(target=render_grid, daemon=True).start()
+    
     while True:
         conn, addr = s.accept()
         with lock:
             try:
                 slot_index = next(i for i, c in enumerate(clients) if c is None)
+                logger.debug(f"Assigned slot {slot_index} to client {addr}")
             except StopIteration:
-                print("[SERVER] All slots full. Rejecting connection.")
+                logger.warning(f"All slots full. Rejecting connection from {addr}")
                 conn.close()
                 continue
         threading.Thread(target=handle_client, args=(conn, addr, slot_index), daemon=True).start()
 
 if __name__ == "__main__":
-    server_main()
+    try:
+        server_main()
+    except KeyboardInterrupt:
+        logger.info("Camera server shutting down...")
+    except Exception as e:
+        logger.error(f"Fatal error in camera server: {e}", exc_info=True)
+        raise
