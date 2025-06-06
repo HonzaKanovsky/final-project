@@ -1,0 +1,130 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>Camera Viewer</title>
+  <script src="https://cdn.tailwindcss.com"></script>
+</head>
+
+<body class="bg-gray-900 text-white min-h-screen flex flex-col">
+
+  <header class="bg-gray-800 p-4 shadow-md flex justify-center">
+    <h1 class="text-2xl font-semibold">Live Camera Feeds</h1>
+  </header>
+
+  <main class="flex-grow p-4">
+    <div id="video-grid" class="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-4">
+      <!-- Video feeds inserted here -->
+    </div>
+  </main>
+
+  <footer class="bg-gray-800 p-3 text-center text-gray-400 text-sm">
+    &copy; 2025 Internex
+  </footer>
+
+  <script>
+    const videoGrid = document.getElementById('video-grid');
+    const NUM_SLOTS = 6;
+    const imgElements = new Array(NUM_SLOTS);
+    const disconnectedOverlays = new Array(NUM_SLOTS);
+    const ipLabels = new Array(NUM_SLOTS);
+
+    for (let i = 0; i < NUM_SLOTS; i++) {
+      const wrapper = document.createElement('div');
+      wrapper.className = 'bg-black rounded shadow-lg overflow-hidden relative aspect-video flex flex-col';
+
+      const label = document.createElement('div');
+      label.textContent = `Camera ${i + 1}`;
+      label.className = 'absolute top-1 left-1 bg-gray-700 bg-opacity-75 text-xs px-2 py-0.5 rounded text-white z-10';
+
+      const container = document.createElement('div');
+      container.className = 'relative flex-grow';
+
+      const img = document.createElement('img');
+      img.className = 'w-full h-full object-cover absolute top-0 left-0';
+      img.alt = `Camera feed ${i + 1}`;
+      img.src = "https://media4.giphy.com/media/v1.Y2lkPTc5MGI3NjExcmY3aWpkMmJkNjAxYzEwdTltNmRtNDR1enh1dG02YXk4bGw1ajRxcSZlcD12MV9pbnRlcm5hbF9naWZfYnlfaWQmY3Q9Zw/bGdMdnVwLYZOYSu7jk/giphy.gif";
+
+      const overlay = document.createElement('div');
+      overlay.className = 'absolute top-1/2 left-1/2 transform -translate-x-1/2 -translate-y-1/2 bg-black bg-opacity-70 px-3 py-1 rounded text-sm';
+      overlay.textContent = 'Disconnected';
+
+      const ipLabel = document.createElement('div');
+      ipLabel.textContent = 'IP: Unknown';
+      ipLabel.className = 'text-xs text-center text-gray-400 mt-1';
+
+      container.appendChild(img);
+      container.appendChild(overlay);
+
+      wrapper.appendChild(container);
+      wrapper.appendChild(label);
+      wrapper.appendChild(ipLabel);
+      videoGrid.appendChild(wrapper);
+
+      imgElements[i] = img;
+      disconnectedOverlays[i] = overlay;
+      ipLabels[i] = ipLabel;
+    }
+
+    const protocol = location.protocol === 'https:' ? 'wss' : 'ws';
+    const ws = new WebSocket(`${protocol}://${location.host}/?type=viewer`);
+
+ws.onmessage = (event) => {
+  const message = JSON.parse(event.data);
+  if (message.type === 'frame') {
+    const { slot, data } = message;
+    const img = imgElements[slot];
+    const overlay = disconnectedOverlays[slot];
+    if (!img || !overlay) return;
+
+    const blob = base64ToBlob(data, 'image/jpeg');
+    const url = URL.createObjectURL(blob);
+
+    img.src = url;
+    overlay.style.display = 'none';  // Hide overlay when frame received
+
+    img.onload = () => {
+      URL.revokeObjectURL(url);
+    };
+  } else if (message.type === 'ip') {
+    const { slot, ip } = message;
+    console.log(`IP message received for slot ${slot}: ${ip}`);  // Debug log
+
+    const label = ipLabels[slot];
+    if (label) label.textContent = `IP: ${ip}`;
+
+    const img = imgElements[slot];
+    const overlay = disconnectedOverlays[slot];
+    if (!img || !overlay) return;
+
+    if (ip === 'Disconnected') {
+      console.log(`Slot ${slot} disconnected, showing overlay and resetting image`);
+      overlay.style.display = 'block';  // Show overlay
+      img.src = "https://media4.giphy.com/media/v1.Y2lkPTc5MGI3NjExcmY3aWpkMmJkNjAxYzEwdTltNmRtNDR1enh1dG02YXk4bGw1ajRxcSZlcD12MV9pbnRlcm5hbF9naWZfYnlfaWQmY3Q9Zw/bGdMdnVwLYZOYSu7jk/giphy.gif";
+    } else {
+      // If connected with real IP, hide overlay
+      overlay.style.display = 'none';
+    }
+  }
+};
+
+
+
+    ws.onopen = () => console.log('WebSocket connected (viewer)');
+    ws.onerror = (e) => console.error('WebSocket error (viewer):', e);
+    ws.onclose = () => console.log('WebSocket closed (viewer)');
+
+    function base64ToBlob(base64, type = '') {
+      const binary = atob(base64);
+      const array = [];
+      for (let i = 0; i < binary.length; i++) {
+        array.push(binary.charCodeAt(i));
+      }
+      return new Blob([new Uint8Array(array)], { type });
+    }
+  </script>
+</body>
+
+</html>
