@@ -46,7 +46,30 @@ wss.on('connection', (ws, req) => {
     }));
 
     ws.on('message', (data) => {
-      broadcastToViewers(data, slot);
+      try {
+        // Check if the message is JSON (IP update) or binary (frame data)
+        if (data instanceof Buffer) {
+          // It's a frame, send it directly
+          console.log(`Received frame data of length ${data.length} from slot ${slot}`);
+          if (data.length > 100) { // Only process frames larger than 100 bytes
+            broadcastFrame(data, slot);
+          } else {
+            console.log('Frame too small, skipping');
+          }
+        } else {
+          // It's a JSON message (like IP update)
+          const message = JSON.parse(data);
+          if (message.type === 'ip') {
+            broadcastToViewersRaw(JSON.stringify({
+              type: 'ip',
+              slot,
+              ip: message.ip
+            }));
+          }
+        }
+      } catch (error) {
+        console.error('Error processing message:', error);
+      }
     });
 
   } else if (clientType === 'viewer') {
@@ -79,7 +102,6 @@ wss.on('connection', (ws, req) => {
 
     delete clients[clientId];
   });
-
 });
 
 function assignSlot() {
@@ -94,18 +116,27 @@ function assignSlot() {
   return -1;
 }
 
-function broadcastToViewers(frameData, slot) {
+function broadcastFrame(frameData, slot) {
+  try {
+    // Convert the binary data to base64
+    const base64Data = frameData.toString('base64');
+    
+    // Create the message with proper formatting
   const message = JSON.stringify({
     type: 'frame',
     slot,
-    data: frameData.toString('base64')
+      data: base64Data
   });
 
+    // Send to all viewers
   Object.values(clients).forEach(client => {
     if (client.type === 'viewer' && client.ws.readyState === WebSocket.OPEN) {
       client.ws.send(message);
     }
   });
+  } catch (error) {
+    console.error('Error broadcasting frame:', error);
+  }
 }
 
 function broadcastToViewersRaw(rawMessage) {
@@ -115,7 +146,6 @@ function broadcastToViewersRaw(rawMessage) {
     }
   });
 }
-
 
 function generateId() {
   return Math.random().toString(36).substr(2, 9);
